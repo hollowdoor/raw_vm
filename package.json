@@ -1,0 +1,35 @@
+{
+  "name": "raw-vm",
+  "version": "1.0.0",
+  "description": "A very raw VM",
+  "main": "dist/bundle.js",
+  "jsnext:main": "dist/bundle.es.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "cd test && node run.js --coool",
+    "build": "rollup -c"
+  },
+  "keywords": [
+    "vm",
+    "es2015",
+    "modules",
+    "es6"
+  ],
+  "author": "Quentin Engles <hollowdoor99@gmail.com> (https://hollowdoor.github.io/)",
+  "license": "MIT",
+  "dependencies": {
+    "babel-plugin-transform-async-to-generator": "^6.16.0",
+    "babel-preset-env": "^1.1.4",
+    "babel-preset-stage-3": "^6.17.0",
+    "mz": "^2.6.0",
+    "rollup": "^0.37.0",
+    "rollup-plugin-babel": "^2.7.1",
+    "rollup-plugin-node-resolve": "^2.0.0",
+    "source-map-support": "^0.4.6"
+  },
+  "devDependencies": {
+    "rollup-plugin-commonjs": "^6.0.0"
+  }
+}
