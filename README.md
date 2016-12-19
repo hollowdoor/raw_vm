@@ -34,6 +34,12 @@ vm('./script.js', {
 
 ```
 
+Something To Note
+-----------------
+
+Source map support is not available in V8/node so compiled scripts do not provide very useful errors.
+
+
 About
 -----
 
@@ -45,7 +51,10 @@ The principle plugin for babel used inside raw-vm for now is [babel-preset-env](
 
 rollup is used to compile javascript es2015 modules.
 
-Something To Note
------------------
+The options you pass to raw-vm allow it to pretend to be running the script as the main module. You can also set argv0 to make it pretend to be another runtime (vs the usual node path).
 
-Source map support is not available in V8/node so compiled scripts do not provide very useful errors.
+The usual globals are masked with various things like `Object.defineProperty()` getters. So altered globals won't effect the script running the vm. Also some globals have been converted to read only.
+
+`require`, and `module.exports` can be used like usual.
+
+If you want more control, and safety you should probably use [vm2](https://github.com/patriksimek/vm2) instead of this module.
