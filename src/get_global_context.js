@@ -22,9 +22,10 @@ export default function getContext(options){
 
     context.process = new VMProcessMask(options);
     context.console = createConsole();
-
+    //console.log(context.process.mainModule)
     let contextified = vm.createContext(context);
     context.global = contextified;
+    //context.global = context;
 
     return contextified;
 }
@@ -43,10 +44,12 @@ function VMProcessMask(options){
 
     keys.forEach(key=>{
 
-        if(['on', 'emit', 'argv', 'argv0', 'env'].indexOf(key) === -1){
+        if(['on', 'emit', 'argv', 'argv0', 'env', 'mainModule'].indexOf(key) === -1){
             addProperty(this, key);
         }
     });
+
+    this.mainModule = options.main;
 
     this.env = {};
 

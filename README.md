@@ -48,4 +48,4 @@ rollup is used to compile javascript es2015 modules.
 Something To Note
 -----------------
 
-Source map support is not good in V8/node so compiled scripts do not provide very useful errors.
+Source map support is not available in V8/node so compiled scripts do not provide very useful errors.

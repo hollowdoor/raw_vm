@@ -5,12 +5,11 @@ function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'defau
 var path = _interopDefault(require('path'));
 var mz_fs = require('mz/fs');
 var rollup = require('rollup');
-var nodeResolve = _interopDefault(require('rollup-plugin-node-resolve'));
-var commonjs = _interopDefault(require('rollup-plugin-commonjs'));
+var rollupPluginNodeResolve = require('rollup-plugin-node-resolve');
+var rollupPluginCommonjs = require('rollup-plugin-commonjs');
 var babel = _interopDefault(require('rollup-plugin-babel'));
-var vm = _interopDefault(require('vm'));
 var Module = _interopDefault(require('module'));
-var fs = _interopDefault(require('fs'));
+var vm = _interopDefault(require('vm'));
 var EventEmitter = _interopDefault(require('events'));
 var util = _interopDefault(require('util'));
 
@@ -30,12 +29,12 @@ function rollit(source, options){
                     return null;
                 }
             },
-            nodeResolve({
+            /*nodeResolve({
                 jsnext: true,
                 main: true,
                 module: true
             }),
-            commonjs(),
+            commonjs(),*/
             babel(babelSettings)
         ],
         acorn: {
@@ -49,20 +48,24 @@ function rollit(source, options){
             }
         }
     }).then(bundle=>{
-        let sourceMapCode = '';
-        if(options.sourceMaps){
-            sourceMapCode = `var _install = require(
-                "${require.resolve('source-map-support')}");
 
-        _install.install();`;
-        }
+        let sourceMapCode = '';
+
+        /*if(options.sourceMaps){
+
+            sourceMapCode = `require(
+                "${require.resolve('source-map-support')}")
+                .install();`;
+        }*/
 
         let gen = bundle.generate({
             format: 'cjs',
-            sourceMap: true,
-            banner: `(function (exports, require, module, __filename, __dirname) { ${sourceMapCode}`,
+            sourceMap: 'inline',
+            banner: `(function (exports, require, module, __filename, __dirname) { `,
+            intro:`${sourceMapCode}`,
             footer: '\n});'
         });
+
 
         /*TODO
         Fix source map support.
@@ -79,17 +82,15 @@ function rollit(source, options){
         }
 
         if(options.sourceMaps){
-            var map = JSON.stringify(gen.map);
-            let map64 = new Buffer(map).toString('base64');
-            let mapInbed = ['\n//# ', 'sourceMappingURL=data:application/json;',
-            'charset=utf8;base64,'].join('');
-
-            mapInbed =  mapInbed + map64;
-
-            code += mapInbed;
+            code += ['\n/', '/# sourceMappingURL=', gen.map.toUrl(), '\n'].join('');
         }
 
-        return code;
+        //\n
+        console.log(code);
+
+        return {
+            code: code
+        };
 
     });
 
@@ -105,8 +106,8 @@ function getBabelSettings(){
                 },
                 modules: false
             }]
-        ],
-        sourceMaps: 'both'
+        ]//,
+        //sourceMaps: true
     };
 }
 
@@ -143,9 +144,10 @@ function getContext(options){
 
     context.process = new VMProcessMask(options);
     context.console = createConsole();
-
+    //console.log(context.process.mainModule)
     let contextified = vm.createContext(context);
     context.global = contextified;
+    //context.global = context;
 
     return contextified;
 }
@@ -164,10 +166,12 @@ function VMProcessMask(options){
 
     keys.forEach(key=>{
 
-        if(['on', 'emit', 'argv', 'argv0', 'env'].indexOf(key) === -1){
+        if(['on', 'emit', 'argv', 'argv0', 'env', 'mainModule'].indexOf(key) === -1){
             addProperty(this, key);
         }
     });
+
+    this.mainModule = options.main;
 
     this.env = {};
 
@@ -214,59 +218,81 @@ VMProcessMask.prototype.emit = function(){
     process.on.apply(process, arguments);
 };
 
-function makeEnvironment(filename, code, options){
+function compileModule(name, code, module, Module$$1, options){
 
-    options = options || {};
-    const host = options.host || {};
+    let filename = path.resolve(name);
 
-    host.console = console;
-    host.require = require;
-
-    //code = `(function (exports, require, module, __filename, __dirname) { ${code} \n})`;
-
-    const context = getContext(options);
+    module.filename = filename;
 
     let script = new vm.Script(code, {
 		filename: filename,
 		displayErrors: false
     });
 
-    return {
-        run: run
+    const sandbox = getContext(options);
+
+    const _require = function(path$$1){
+        return module.require(path$$1);
     };
 
-    function run(){
+    _require.resolve = function(request) {
+        return Module$$1._resolveFilename(request, self);
+    };
 
-        //console.log('context ', context)
+    require.main = module;
 
-        let module = loadMain();
+    module.id = '.';
 
-        let createRequire = getRequire(context, host);
+    require.extensions = Module$$1._extensions;
 
-        try{
-            let closure = script.runInContext(context, {
-        		filename: filename,
-                lineOffset: 0,
-        		displayErrors: true
-            });
+    require.cache = Module$$1._cache;
 
-            let dirname = path.dirname(filename);
+    Module$$1._cache[filename] = module;
 
-            var returned = closure.call(
-                context,
-                module.exports,
-                createRequire(module, Module, require),
-                module,
-                filename,
-                dirname
-            );
 
-        }catch(e){
-            console.log(e);
-        }
+    try{
+        let closure = script.runInNewContext(sandbox, {
+            filename: filename,
+            breakOnSigint: true
+        });
+
+        let dirname = path.dirname(filename);
+
+        let returned = closure.call(
+            sandbox,
+            module.exports,
+            require, //createRequire(module, Module, require),
+            module,
+            filename,
+            dirname
+        );
 
         return returned;
+
+    }catch(e){
+        console.log(e);
     }
+}
+
+//http://fredkschott.com/post/2014/06/require-and-the-module-system/
+//https://github.com/nodejs/node-v0.x-archive/blob/069dd07a1732c6a752773aaed9e8c18ab472375f/lib/module.js#L354
+function makeEnvironment(filename, code, options){
+    let module = loadMain();
+    let running = false;
+
+    return {
+        run: function(){
+            if(running) return;
+            running = true;
+            return compileModule(
+                filename,
+                code,
+                module,
+                Module,
+                options
+            );
+        }
+    };
 
     function loadMain(){
         /*
@@ -283,60 +309,16 @@ function makeEnvironment(filename, code, options){
 
         //if (isMain) {
           process.mainModule = module;
-          module.id = '.';
+          module.id = path.resolve(filename);
         //}
 
         Module._cache[filename] = module;
         process._tickCallback();
 
+        module.loaded = true;
+
         return module;
     }
-
-}
-
-//http://fredkschott.com/post/2014/06/require-and-the-module-system/
-function getRequire(context, host){
-    let code = fs.readFileSync(`${__dirname}/sandbox.js`, 'utf8');
-    let closure = vm.runInContext(
-        `(function (host) { ${code} \n})`, context, {
-            filename: `${__dirname}/sandbox.js`,
-            displayErrors: false
-    });
-
-    return closure.call(context, host)
-}
-
-function isArray(thing){
-    return (Object.prototype.toString.call(thing) === '[object Array]');
-}
-
-function deepCopy(dest, src){
-
-    if(typeof src !== 'object'){
-        return src;
-    }
-
-    for(let name in src){
-
-        if(name === 'global'){
-            continue;
-        }
-        console.log('name ', name);
-        console.log(src);
-        if(src.hasOwnProperty && src.hasOwnProperty(name)){
-            if(isArray(src[name])){
-                dest[name] = src[name].map(a=>deepCopy({}, a));
-            }else if(src[name] !== null && typeof src[name] === 'object'){
-                dest[name] = deepCopy({}, src[name]);
-            }else{
-                dest[name] = src[name];
-            }
-        }else{
-            dest[name] = src[name];
-        }
-    }
-
-    return dest;
 }
 
 const cwd = process.cwd();
@@ -354,8 +336,11 @@ function esVM(mainscript, options){
     return rollit(wholeName, {
         showWarning: options.showWarning || false,
         sourceMaps: options.sourceMaps || false
-    }).then(code=>{
-        return makeEnvironment(scriptname, code, options);
+    }).then(result=>{
+        return makeEnvironment(
+            scriptname,
+            result.code,
+            options);
     });
 }
 

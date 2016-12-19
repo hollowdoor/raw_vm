@@ -21,12 +21,12 @@ export default function rollit(source, options){
                     return null;
                 }
             },
-            nodeResolve({
+            /*nodeResolve({
                 jsnext: true,
                 main: true,
                 module: true
             }),
-            commonjs(),
+            commonjs(),*/
             babel(babelSettings)
         ],
         acorn: {
@@ -40,20 +40,24 @@ export default function rollit(source, options){
             }
         }
     }).then(bundle=>{
-        let sourceMapCode = '';
-        if(options.sourceMaps){
-            sourceMapCode = `var _install = require(
-                "${require.resolve('source-map-support')}");
 
-        _install.install();`;
-        }
+        let sourceMapCode = '';
+
+        /*if(options.sourceMaps){
+
+            sourceMapCode = `require(
+                "${require.resolve('source-map-support')}")
+                .install();`;
+        }*/
 
         let gen = bundle.generate({
             format: 'cjs',
-            sourceMap: true,
-            banner: `(function (exports, require, module, __filename, __dirname) { ${sourceMapCode}`,
+            sourceMap: 'inline',
+            banner: `(function (exports, require, module, __filename, __dirname) { `,
+            intro:`${sourceMapCode}`,
             footer: '\n});'
         })
+
 
         /*TODO
         Fix source map support.
@@ -70,17 +74,16 @@ export default function rollit(source, options){
         }
 
         if(options.sourceMaps){
-            var map = JSON.stringify(gen.map);
-            let map64 = new Buffer(map).toString('base64');
-            let mapInbed = ['\n//# ', 'sourceMappingURL=data:application/json;',
-            'charset=utf8;base64,'].join('');
-
-            mapInbed =  mapInbed + map64;
-
-            code += mapInbed;
+            code += ['\n/', '/# sourceMappingURL=', gen.map.toUrl(), '\n'].join('');
         }
 
-        return code;
+        //\n//# sourceMappingURL=data:application/json;',
+
+        console.log(code)
+
+        return {
+            code: code
+        };
 
     });
 
@@ -96,8 +99,8 @@ function getBabelSettings(){
                 },
                 modules: false
             }]
-        ],
-        sourceMaps: 'both'
+        ]//,
+        //sourceMaps: true
     };
 }
 

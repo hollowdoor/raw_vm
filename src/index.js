@@ -1,5 +1,5 @@
 import path from 'path';
-import compile from './compile.js';
+import compile from './compile_es.js';
 import createEnvironment from './environ.js';
 const cwd = process.cwd();
 
@@ -16,7 +16,10 @@ export default function esVM(mainscript, options){
     return compile(wholeName, {
         showWarning: options.showWarning || false,
         sourceMaps: options.sourceMaps || false
-    }).then(code=>{
-        return createEnvironment(scriptname, code, options);
+    }).then(result=>{
+        return createEnvironment(
+            scriptname,
+            result.code,
+            options);
     });
 }

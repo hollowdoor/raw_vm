@@ -1,6 +1,8 @@
 import path from 'path';
 import fs from 'fs';
 import sub from './sub';
+
+//while(true){}// console.log('ok'); break; }
 console.log('------\n', 'starting script.js')
 sub();/*
 console.log('--- This is a child process. ---');

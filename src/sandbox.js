@@ -15,7 +15,7 @@ return ((host)=>{
         };
 
         Object.defineProperties(_require, {
-            main: {value: host.main},
+            main: {value: module},
             resolve: {
                 get: function(){
                     return r.resolve;
