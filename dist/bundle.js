@@ -3,126 +3,11 @@
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
 var path = _interopDefault(require('path'));
-var mz_fs = require('mz/fs');
-var rollup = require('rollup');
-var rollupPluginNodeResolve = require('rollup-plugin-node-resolve');
-var rollupPluginCommonjs = require('rollup-plugin-commonjs');
-var babel = _interopDefault(require('rollup-plugin-babel'));
+var compile = _interopDefault(require('compile-es-for-node'));
 var Module = _interopDefault(require('module'));
 var vm = _interopDefault(require('vm'));
 var EventEmitter = _interopDefault(require('events'));
 var util = _interopDefault(require('util'));
-
-function rollit(source, options){
-
-    const babelSettings = getBabelSettings();
-
-    return rollup.rollup({
-        entry: source,
-        plugins: [
-            {
-                resolveId: function (importee, importer) {
-
-                    if(importer && /^\//.test(importee)){
-                        return importee;
-                    }
-                    return null;
-                }
-            },
-            /*nodeResolve({
-                jsnext: true,
-                main: true,
-                module: true
-            }),
-            commonjs(),*/
-            babel(babelSettings)
-        ],
-        acorn: {
-            allowHashBang: true
-        },
-        onwarn: (warning)=>{
-            //No need for warnings.
-            //Try to act like a normal child process.
-            if(options.showWarning){
-                console.warn(warning);
-            }
-        }
-    }).then(bundle=>{
-
-        let sourceMapCode = '';
-
-        /*if(options.sourceMaps){
-
-            sourceMapCode = `require(
-                "${require.resolve('source-map-support')}")
-                .install();`;
-        }*/
-
-        let gen = bundle.generate({
-            format: 'cjs',
-            sourceMap: 'inline',
-            banner: `(function (exports, require, module, __filename, __dirname) { `,
-            intro:`${sourceMapCode}`,
-            footer: '\n});'
-        });
-
-
-        /*TODO
-        Fix source map support.
-        Right now source maps don't work inside vm*/
-
-        let code = gen.code;
-
-
-        let bangReg = /\n#[!][^\n]+?\n/;
-
-        //Get rid of that pesky hash bang.
-        if(bangReg.test(code)){
-            code = code.replace(bangReg, '\n\n');
-        }
-
-        if(options.sourceMaps){
-            code += ['\n/', '/# sourceMappingURL=', gen.map.toUrl(), '\n'].join('');
-        }
-
-        //\n
-        console.log(code);
-
-        return {
-            code: code
-        };
-
-    });
-
-}
-
-function getBabelSettings(){
-
-    return {
-        presets: [
-            ["env", {
-                "targets": {
-                    "node": "current"
-                },
-                modules: false
-            }]
-        ]//,
-        //sourceMaps: true
-    };
-}
-
-/*function getBabelSettings(){
-    return fs.readFile(path.join(process.cwd(), '.babelrc'))
-    .then(
-        contents=>{},
-        error=>{
-            return {
-                presets: [require.resolve("babel-preset-stage-3")],
-                sourceMaps: true
-            };
-        }
-    );
-}*/
 
 const rootProps = [
     'Buffer',
@@ -321,6 +206,7 @@ function makeEnvironment(filename, code, options){
     }
 }
 
+//import compile from './compile_es.js';
 const cwd = process.cwd();
 
 function esVM(mainscript, options){
@@ -333,7 +219,8 @@ function esVM(mainscript, options){
 
     let scriptname = mainscript.replace(/[.]\//, '');
 
-    return rollit(wholeName, {
+    return compile(wholeName, {
+        wrap: true,
         showWarning: options.showWarning || false,
         sourceMaps: options.sourceMaps || false
     }).then(result=>{
